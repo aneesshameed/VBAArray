@@ -7,11 +7,16 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
+
+'''''''''''''''''''''''''''''''''''''''''/'''''''''''''''''''''''''''''''''''''''''
+''''''''''''''''''''''''''''''''''''Code Starts''''''''''''''''''''''''''''''''''''
+'''''''''''''''''''''''''''''''''''''''''/'''''''''''''''''''''''''''''''''''''''''
+
 'Public variable of the class
 Private LocalArray() As Variant
 
 
-'Initilization of array
+'Initialization of array
 
 
 Private Sub Class_Initialize()
@@ -27,7 +32,7 @@ End Sub
 'Logic: For each items in Arguments() increase size of array and add item to last index
 
 
-Public Function Push(ParamArray items() As Variant)
+Public Sub Push(ParamArray items() As Variant)
     
     'Redim array, extent its ubound by one, and push item to newly created index
     For I = 0 To UBound(items) 'Cannot run GetUbound on items as it is not an Array but ParamArray
@@ -37,7 +42,7 @@ Public Function Push(ParamArray items() As Variant)
         LocalArray(GetUbound(LocalArray)) = items(I)
     Next I
     
-End Function
+End Sub
 
 
 'Add an item to the beginning of array
@@ -46,7 +51,7 @@ End Function
 'At the end clone LocalArray() with newly created temp()
 
 
-Public Function UnShift(ParamArray items() As Variant)
+Public Sub UnShift(ParamArray items() As Variant)
     
     'Create a temp() and redim its size
     Dim temp() As Variant
@@ -68,7 +73,7 @@ Public Function UnShift(ParamArray items() As Variant)
    'Now clone temp() to LocalArray()
     LocalArray = temp
     
-End Function
+End Sub
 
 
 'Removes an item from the beginning of array
@@ -76,9 +81,9 @@ End Function
 'At the end clone temp() to LocalArray()
 
 
-Public Function Shift()
+Public Sub Shift()
     
-    'Initilize temp()
+    'Initialize temp()
     Dim temp() As Variant
     ReDim temp(0)
         
@@ -92,7 +97,7 @@ Public Function Shift()
     
     'Now clone temp() to LocalArray()
     LocalArray = temp
-End Function
+End Sub
 
 
 'Creates a new VBAArray class by selecting elements specified by Start index and count
@@ -102,23 +107,46 @@ End Function
 'Return class to parent.
 
 
-Public Function Slice(ByVal Start As Integer, ByVal HowMany As Integer) As VBAArray
+Public Function Slice(Optional StartIndex As Variant, Optional EndIndex As Variant) As VBAArray
     
     On Error GoTo SendNullArray
-    'Initilize temp()
+    'Initialize temp()
     Dim temp() As Variant
     
-    If Start < GetUbound(LocalArray) Then
+    
+    'If StartIndex is missing then user need all items in old array to a new array
+    If IsMissing(StartIndex) Then
+        StartIndex = 0
+    Else
         
-        'Push items to temp() if index is between the Start and Start+HowMany
-        For I = 0 To GetUbound(LocalArray)
-            If I >= Start And I < Start + HowMany Then
-                ReDim Preserve temp(0 To GetReDimSize(temp))
-                temp(GetUbound(temp)) = LocalArray(I)
-            End If
-        Next I
-     
+        'If StartIndex is give as negative, then operation starts from end of array
+        If StartIndex < 0 Then
+            StartIndex = GetUbound(LocalArray) + StartIndex
+        End If
     End If
+    
+    
+    'If EndIndex is missing then user needs to get all items after StartIndex
+    If IsMissing(EndIndex) Then
+        EndIndex = GetUbound(LocalArray)
+    Else
+        
+        'If EndIndex is negative number then operation is supposed to start from end of array
+        If EndIndex < 0 Then
+            EndIndex = GetUbound(LocalArray) + EndIndex
+        Else
+            EndIndex = WorksheetFunction.Min(StartIndex + EndIndex, GetUbound(LocalArray))
+        End If
+    End If
+    
+    
+    'Push items to temp() if index is between the Start and Start+HowMany
+    For I = 0 To GetUbound(LocalArray)
+        If I >= StartIndex And I <= EndIndex Then
+            ReDim Preserve temp(0 To GetReDimSize(temp))
+            temp(GetUbound(temp)) = LocalArray(I)
+        End If
+    Next I
     
     'Now clone temp() to LocalArray(). For that create a new class of VBAArray and name it Slice.
     'Move all the items in temp() to Slice.
@@ -126,6 +154,8 @@ Public Function Slice(ByVal Start As Integer, ByVal HowMany As Integer) As VBAAr
     For I = 0 To GetUbound(temp)
         Slice.Push (temp(I))
     Next I
+    
+    'And exit function
     Exit Function
     
 SendNullArray:
@@ -139,31 +169,50 @@ End Function
 'NewItems is an optional variable, If it is present then those need to be pushed to the index from Start
 
 
-Public Function Splice(ByVal Start As Integer, ByVal HowMany As Integer, Optional NewItems As Variant)
+Public Sub Splice(ByVal StartIndex As Integer, Optional HowMany As Variant, Optional NewItems As Variant)
     
-    'Initilize temp()
+    On Error GoTo SendFullArray
+    
+    
+    'Initialize temp()
     Dim temp() As Variant
     
-    'If HowMany is not zero then we need to take out items which are between Start and HowMany
-    If HowMany <> 0 Then
+    
+    'If start index is negative then operation is supposed to start from end of array
+    If StartIndex < 0 Then
+        StartIndex = GetUbound(LocalArray) + StartIndex + 1
+    Else
         
         
-        Start = WorksheetFunction.Min(Start, GetUbound(LocalArray))
-        HowMany = WorksheetFunction.Min(HowMany, GetUbound(LocalArray) + 1)
-            
+        'Else if user is giving a StartIndex which is greater than UBound of array, then take UBound as StartIndex
+        StartIndex = WorksheetFunction.Min(StartIndex, GetUbound(LocalArray))
+    End If
+        
+        
+    'If HowMany is being defined then we need to take out items which are between StartIndex and HowMany
+    If Not IsMissing(HowMany) And IsNumeric(HowMany) Then
+        
+        HowMany = WorksheetFunction.Min(HowMany, GetUbound(LocalArray))
+        
+        
         'For all indexes in LocalArray
         For I = 0 To GetUbound(LocalArray)
             
-            'If index is less than Start and greater then Start+HowMany-1 then we need to push those items to temp()
-            If I < Start Or I >= Start + HowMany Then
+            
+            'If index is less than StartIndex and greater then StartIndex+HowMany-1 then we need to push those items to temp()
+            If I < StartIndex Or I >= StartIndex + HowMany Then
                 ReDim Preserve temp(0 To GetReDimSize(temp))
                 temp(GetUbound(temp)) = LocalArray(I)
             End If
         Next I
-    Else
         
-        'If there are nothing to be deleted then all items from LocalArray() need to be pushed to temp()
-        For I = 0 To GetUbound(LocalArray)
+    Else
+    
+        StartIndex = StartIndex - 1
+        
+        
+        'If there are nothing to be deleted then all items from LocalArray() need to be pushed to temp() till one less than StartIndex
+        For I = 0 To StartIndex
             ReDim Preserve temp(0 To GetReDimSize(temp))
             temp(GetUbound(temp)) = LocalArray(I)
         Next I
@@ -171,91 +220,109 @@ Public Function Splice(ByVal Start As Integer, ByVal HowMany As Integer, Optiona
     'Now we new have temp() that contains only items that are needed
     
     
-    'Now add NewItems to temp(), these items needs to be pushed after the start index
+    'Now add NewItems to temp(), these items needs to be pushed after the StartIndex
     If Not IsMissing(NewItems) Then
-    
+        
+        
         'If NewItems is passed as an array, then push all items in NewItems to temp(). Otherwise NewItems is just a string, just push
         'only one item to array.
         If IsArray(NewItems) Then
             
+            
             'Index of last non empty cell, Soring this value as we are soon going to ReDim temp()
-            Dim LastNonEmptyIndex As Integer
-            LastNonEmptyIndex = GetUbound(temp)
+            Dim UboundAfterRemoval As Integer
+            UboundAfterRemoval = GetUbound(temp)
+            
             
             'Redim array to length spanning earlier length and length of NewItems()
-            If LastNonEmptyIndex = -1 Then
+            If UboundAfterRemoval = -1 Then
                 
-                'If LastNonEmptyIndex is zero then it means user have asked to take nothing from LocalArray()
+                
+                'If UboundAfterRemoval is less than zero then it means user have asked to take nothing from LocalArray()
                 'In this case temp() need to be ReDimmed to 0 to UBound(NewItems)
                 'Consider NewItems() as [8,9,10], Ubound(NewItems) will be 2
-                'Our result should then be [8,9,10] Ubound will be 2
-                'Hence do a ReDim of array to 0 to (2)
-
+                'Hence do a ReDim of array to 0 to (2) and push NewItems
                 ReDim Preserve temp(0 To GetUbound(NewItems))
                 For I = 0 To GetUbound(NewItems)
                     ReDim Preserve temp(0 To GetReDimSize(temp))
                     temp(GetUbound(temp)) = NewItems(I)
                 Next I
                 LocalArray = temp
-                Exit Function
-            ElseIf LastNonEmptyIndex <= Start Then
+                Exit Sub
+            ElseIf UboundAfterRemoval = StartIndex - 1 Then
                 
-                'Consider Current temp() as [1,2,3,4,5], User asked to splice from 2 items from 3.
-                'This will lead to [1,2] and LastNonEmptyIndex as 1.
-                'Hence LastNonEmptyIndex becomes less than start
-                'This will lead to situation that need to  push all items to the end of array
+                
+                'Consider Current temp() as [1,2,3,4,5], User asked to splice 3 items from index 2.
+                'This will lead to [1,2] and UboundAfterRemoval as 1.
+                'Hence UboundAfterRemoval becomes equals to  StartIndex
+                'This will lead to situation that need to push all items to the end of array
                 ReDim Preserve temp(0 To GetUbound(temp) + UBound(NewItems) + 1)
                 
                 For I = 0 To GetUbound(NewItems)
-                    temp(Start + I) = NewItems(I)
+                    temp(StartIndex + I) = NewItems(I)
                 Next I
                 LocalArray = temp
-                Exit Function
+                Exit Sub
             Else
                 
-                'Consider Current temp() as [1,2,3,4,5], User asked to splice from 2 items from index 1.
-                'This will lead to [1,4,5] and LastNonEmptyIndex as 2. Start is 1 in this case.
-                'Means, LastNonEmptyIndex is greater than Start.
-                'This implies all items that are from index Start to LastNonEmptyIndex is supposed to be moved towards the end of temp()
-                'We first need to ReDim temp() to accomodate all items in NewItems()
                 
+                'Consider Current temp() as [1,2,3,4,5], User asked to splice from 2 items from index 1.
+                'This will lead to [1,4,5] and UboundAfterRemoval as 2. StartIndex is 1 in this case.
+                'Means, UboundAfterRemoval is greater than StartIndex.
+                'This implies all items that are from StartIndex to UboundAfterRemoval is supposed to be moved towards the end of temp()
+                
+                
+                'We first need to ReDim temp() to accomodate all items in NewItems()
                 ReDim Preserve temp(0 To GetUbound(temp) + UBound(NewItems) + 1)
+                
+                
+                'Now move items to end of array
                 Dim J As Integer
                 J = 0
-                For I = Start To LastNonEmptyIndex
-                    temp(UBound(temp) - J) = temp(LastNonEmptyIndex - J)
+                For I = StartIndex To UboundAfterRemoval
+                    temp(UBound(temp) - J) = temp(UboundAfterRemoval - J)
                     J = J + 1
                 Next I
                 
+                
+                'Now update index starting from StartIndex with new items
                 For I = 0 To GetUbound(NewItems)
-                    temp(Start + I) = NewItems(I)
+                    temp(StartIndex + I) = NewItems(I)
                 Next I
                 LocalArray = temp
-                Exit Function
+                Exit Sub
             End If
         Else
+            
+            
             'Else item is a string. Increase temp() by just 1. Shift items by one index up.
             ReDim Preserve temp(0 To UBound(temp) + 1)
             
+            
             'Get Last index of temp()
-            Dim LastIndex
-            LastIndex = UBound(temp)
+            UboundAfterRemoval = UBound(temp)
 
-            Do While LastIndex > Start
+            Do While UboundAfterRemoval > StartIndex
+                
                 
                 'Update nth index of temp() by n-length of NewItems() of temp. This way we are moving items to the end of temp()
-                temp(LastIndex) = temp(LastIndex - 1)
-                LastIndex = LastIndex - 1
+                temp(UboundAfterRemoval) = temp(UboundAfterRemoval - 1)
+                UboundAfterRemoval = UboundAfterRemoval - 1
             Loop
              
-            'And add NewItems to index next to Start
-            temp(Start) = NewItems
+            
+            'And add NewItems to index next to StartIndex
+            temp(UboundAfterRemoval) = NewItems
             LocalArray = temp
-            Exit Function
+            Exit Sub
         End If
+    Else
+        LocalArray = temp
     End If
+    Exit Sub
+SendFullArray:
     
-End Function
+End Sub
 
 'Removes an item from the end of array
 'Logic: To remove item from end, ReDim by setting ubound on less
@@ -266,9 +333,9 @@ Public Function Pop()
 End Function
 
 'Removes an item from array specified by index
-Public Function Remove(ByVal Index As Integer)
+Public Sub Remove(ByVal Index As Integer)
     
-    'Initilize temp()
+    'Initialize temp()
     Dim temp() As Variant
     ReDim temp(0)
     
@@ -284,33 +351,39 @@ Public Function Remove(ByVal Index As Integer)
     
     'Clone temp() to LocalArray()
     LocalArray = temp
-End Function
+End Sub
 
 
-'Returns item specified by the index
-Public Function ValueOf(ByVal Index As Variant)
+'Returns item specified by the index.
+'If a NewValue has been passed then index will be set to NewValue and the same will be passed
+Public Function Value(ByVal Index As Variant, Optional NewValue As Variant)
     
     'If index is greater then Ubound then return undefined
     If Index > UBound(LocalArray) Then
-        ValueOf = "Undefined"
+        Value = "Undefined"
     Else
-        
+        If Not IsMissing(NewValue) Then
+            
+            'If NewValue is passed to
+            LocalArray(Index) = NewValue
+            Value = LocalArray(Index)
+        Else
         'Else return value
-        ValueOf = LocalArray(Index)
+            Value = LocalArray(Index)
+        End If
     End If
 End Function
 
 'Send all values in VBAArray as proper array
 Public Function Arrayify()
     
-    'Initilize temp
+    'Initialize temp
     Dim temp() As Variant
-    ReDim temp(0)
     
     'Push everything to temp
     For I = 0 To UBound(LocalArray)
         ReDim Preserve temp(0 To GetReDimSize(temp))
-        temp(UBound(temp) - 1) = LocalArray(I)
+        temp(UBound(temp)) = LocalArray(I)
     Next I
     
     'Send back temp
@@ -322,16 +395,16 @@ End Function
 'Returns length of an array
 Public Function Length()
     
-On Error GoTo Err:
-    'Length us Ubound
-    If LocalArray(0) = Empty Then
-        Length = 0
-    Else
-        Length = UBound(LocalArray) + 1
-    End If
-    Exit Function
+    On Error GoTo Err:
+        'Length us Ubound
+        If LocalArray(0) = Empty Then
+            Length = 0
+        Else
+            Length = UBound(LocalArray) + 1
+        End If
+        Exit Function
 Err:
-    Length = 0
+        Length = 0
 End Function
 
 
@@ -340,21 +413,21 @@ End Function
 'Else vba will throw error.
 Public Function IndexOf(item As Variant)
 
-'Attached error catching.
-On Error GoTo Err:
-    
-    'Get index by match function and exit function
-    IndexOf = Application.Match(item, LocalArray, False) - 1
-    Exit Function
-    
-    'In case of error return -1
+    'Attached error catching.
+    On Error GoTo Err:
+        
+        'Get index by match function and exit function
+        IndexOf = Application.Match(item, LocalArray, False) - 1
+        Exit Function
+        
+        'In case of error return -1
 Err:
-    IndexOf = -1
+        IndexOf = -1
 End Function
 
-'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-''''''''''''''''''''''''''Private Functions''''''''''''''''''''''''''''''''''''''''
-'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'''''''''''''''''''''''''''''''''''''''''/'''''''''''''''''''''''''''''''''''''''''
+'''''''''''''''''''''''''''''''''Private Functions'''''''''''''''''''''''''''''''''
+'''''''''''''''''''''''''''''''''''''''''/'''''''''''''''''''''''''''''''''''''''''
 Private Function GetReDimSize(Element)
     
     'If first index is empty then return 0 else return the size of array
