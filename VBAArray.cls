@@ -218,6 +218,55 @@ SendFullArray:
     
 End Sub
 
+'Reverse an array
+'Note: There is no reverse iteration in VBA
+'Logic: Start from 0 to UBound of LocalArray, push each items from the end of array to temp()
+'Clone temp() to LocalArray
+
+Public Sub Reverse()
+    
+    'Initialize temp()
+    Dim temp As New VBAArray
+    
+    'Iterate from 0 to UBound
+    For i = 0 To UBound(LocalArray)
+        
+        'Push items from end of array
+        temp.Push (LocalArray(UBound(LocalArray) - i))
+    Next i
+    
+    LocalArray = temp.Arrayify
+End Sub
+
+
+'Joins array seperated by the Delimiter passed
+'Logic: Create temp as string.
+'Starting from 0 to UBound concatenate values from LocalArray and delimiter to temp
+
+Public Function Join(Optional Delimiter As Variant)
+    
+    'Initialize temp as string
+    Dim temp As String
+    temp = ""
+    
+    'If delimiter is missing then set Delimiter as ','
+    If IsMissing(Delimiter) Then
+        Delimiter = ","
+    End If
+    
+    'Loop for items from 0 to Ubound - 1
+    For i = 0 To UBound(LocalArray) - 1
+        temp = temp & LocalArray(i) & Delimiter
+    Next i
+    
+    'And then concatenate value in last index
+    temp = temp & LocalArray(i)
+    
+    'Clone temp() to LocalArray()
+    Join = temp
+End Function
+
+
 'Returns item specified by the index.
 'If a NewValue has been passed then index will be set to NewValue and the same will be passed
 
